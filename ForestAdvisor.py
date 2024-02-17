@@ -25,12 +25,12 @@ common_gap_width = 3
 common_entry_width = 24
 state_fg = {None:"black", -1:"orange", 0:"blue", 1:"#00EE00"}
 default_path_dict = {"modelFormat":"Model/{0}.h5", "imageFormat":"Image/{0}.png", "lossFormat":"Loss/{0}.csv", "resultFormat":"Result/{0}.csv"}
-environment_requirements = [																																									\
-	("numpy", "global arange, array, concatenate, shuffle, where\nfrom numpy import arange, array, concatenate, where\nfrom numpy.random import shuffle", "Try to run \"pip install numpy\" to handle this issue. "), 															\
-	("pandas", "global DF, read_csv, read_excel\nfrom pandas import DataFrame as DF, read_csv, read_excel", "Try to run \"pip install pandas\" to handle this issue. "), 																			\
-	("matplotlib", "global plt\nfrom matplotlib import pyplot as plt, use\nuse(\"Agg\")", "Try to run \"pip install matplotlib\" to handle this issue. "), 																					\
-	("sklearn", "global StandardScaler, MinMaxScaler\nfrom sklearn.preprocessing import StandardScaler, MinMaxScaler", "Try to install sklearn correctly. "), 																				\
-	("tensorflow", "global Activation, Dense, Dropout, GRU, load_model, LSTM, plot_model, Sequential\nfrom tensorflow.python.keras.layers import Activation, Dense, Dropout\nfrom tensorflow.python.keras.layers.recurrent import GRU, LSTM\nfrom tensorflow.python.keras.models import load_model, Sequential", "Try to install tensorflow correctly. ")		\
+environment_requirements = [																																					\
+	("numpy", "global arange, array, concatenate, shuffle, where\nfrom numpy import arange, array, concatenate, where\nfrom numpy.random import shuffle", "Try to run \"pip install numpy\" to handle this issue. "), 																			\
+	("pandas", "global DF, read_csv, read_excel\nfrom pandas import DataFrame as DF, read_csv, read_excel", "Try to run \"pip install pandas\" to handle this issue. "), 																							\
+	("matplotlib", "global plt\nfrom matplotlib import pyplot as plt, use\nuse(\"Agg\")", "Try to run \"pip install matplotlib\" to handle this issue. "), 																									\
+	("sklearn", "global StandardScaler, MinMaxScaler\nfrom sklearn.preprocessing import StandardScaler, MinMaxScaler", "Try to install sklearn correctly. "), 																								\
+	("tensorflow", "global Activation, Dense, Dropout, GRU, load_model, LSTM, plot_model, Sequential\nfrom tensorflow.python.keras.layers import Activation, Dense, Dropout\nfrom tensorflow.python.keras.layers.recurrent import GRU, LSTM\nfrom tensorflow.python.keras.models import load_model, Sequential\nfrom tensorflow.keras.utils import plot_model", "Try to install tensorflow correctly. ")		\
 ]
 isEnvironmentReady = False
 config = {"lag":12, "batch":1024, "epochs":10000, "validation_split":0.05}
@@ -376,13 +376,6 @@ def train(button, encoding = "utf-8") -> bool:
 			showerror("Error", "Failed saving the model. \nPlease refer to the command prompt window for details. \nPlease press enter key to " + ("retry (Remain: {0}). ".format(i) if i else "continue. "))
 	else:
 		bRet = False
-	try:
-		from tensorflow.keras.utils import plot_model
-	except ImportError:
-		try:
-			from tensorflow.python.keras.utils.vis_utils import plot_model
-		except ImportError:
-			pass
 	for i in range(MAX_RETRY_COUNT - 1, -1, -1):
 		try:
 			handleFolder(os.path.split(imagePath)[0])
