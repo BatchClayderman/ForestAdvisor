@@ -33,7 +33,7 @@ environment_requirements = [																																									\
 	("tensorflow", "global Activation, Dense, Dropout, GRU, load_model, LSTM, plot_model, Sequential\nfrom tensorflow.python.keras.layers import Activation, Dense, Dropout\nfrom tensorflow.python.keras.layers.recurrent import GRU, LSTM\nfrom tensorflow.python.keras.models import load_model, Sequential", "Try to install tensorflow correctly. ")		\
 ]
 isEnvironmentReady = False
-config = {"lag":12, "batch":1024, "epochs":1000, "validation_split":0.05}
+config = {"lag":12, "batch":1024, "epochs":10000, "validation_split":0.05}
 configIvs = {}
 parameter_entry_width = 10
 train_thread = None
