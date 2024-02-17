@@ -39,7 +39,7 @@ parameter_entry_width = 10
 train_thread = None
 attrs = ("Time", "Value")
 controllers = {}
-test_dpi = 1200
+figure_dpi = 1200
 global_metrics = {"MAPE":(lambda r, p, n:sum((p - r) / r) / n), "RMSE":(lambda r, p, n:(sum((p - r) ** 2) / n) ** 0.5), "MSE":(lambda r, p, n:(sum(p - r) ** 2) / n), "SSE":(lambda r, p, n:sum((p - r) ** 2)), "MAE":(lambda r, p, n:sum(abs(p - r)) / n), "SSR":(lambda r, p, n:sum((p - sum(r) / n) ** 2)), "R2":(lambda r, p, n:1 - sum((p - r) ** 2) / sum((sum(r) / n - r) ** 2))}
 comparison_entry_width = 13
 
@@ -378,12 +378,15 @@ def train(button, encoding = "utf-8") -> bool:
 		bRet = False
 	try:
 		from tensorflow.keras.utils import plot_model
-	except:
-		from tensorflow.python.keras.utils.vis_utils import plot_model
+	except ImportError:
+		try:
+			from tensorflow.python.keras.utils.vis_utils import plot_model
+		except ImportError:
+			pass
 	for i in range(MAX_RETRY_COUNT - 1, -1, -1):
 		try:
 			handleFolder(os.path.split(imagePath)[0])
-			plot_model(model, to_file = imagePath, show_shapes = True, expand_nested = True)
+			plot_model(model, to_file = imagePath, show_shapes = True, expand_nested = True, dpi = figure_dpi)
 			print("The model image is successfully saved. ")
 			break
 		except Exception as e:
@@ -575,8 +578,8 @@ def compare(button, encoding = "utf-8") -> None:
 	for value in values[1:]:
 		plt.plot(values[0], value)
 	plt.legend(columns[1:])
-	plt.rcParams["figure.dpi"] = test_dpi
-	plt.rcParams["savefig.dpi"] = test_dpi
+	plt.rcParams["figure.dpi"] = figure_dpi
+	plt.rcParams["savefig.dpi"] = figure_dpi
 	for i in range(MAX_RETRY_COUNT - 1, -1, -1):
 		try:
 			handleFolder(os.path.split(plotPath)[0])
