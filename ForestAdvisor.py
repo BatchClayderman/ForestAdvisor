@@ -1,8 +1,9 @@
 import os
 from datetime import datetime
 from random import uniform
+from threading import Thread
 from tkinter import BOTH, Button, DoubleVar, END, Entry, Frame, IntVar, Label, LEFT, messagebox, RAISED, RIGHT, StringVar, Tk, TOP
-from tkinter.filedialog import askopenfilename, asksaveasfilename
+from tkinter.filedialog import askdirectory, askopenfilename, asksaveasfilename
 from tkinter.messagebox import showinfo, showerror
 from tkinter.ttk import Combobox
 try:
@@ -14,28 +15,33 @@ EXIT_FAILURE = 1
 EOF = (-1)
 GLOBAL_TITLE = "ForestAdvisor"
 MAX_RETRY_COUNT = 5
+tkDpi = "960x540"
 frame_width = 36
 frame_pad = 5
 title_font = ("Times New Roman", 16, "bold")
 title_fg = "red"
 common_font = ("Times New Roman", 12)
 common_gap_width = 3
-common_entry_width = 25
+common_entry_width = 24
 state_fg = {None:"black", -1:"orange", 0:"blue", 1:"#00EE00"}
-default_path_dict = {"modelFormat":"Model/{0}.h5", "lossFormat":"Loss/{0}.csv", "resultFormat":"Result/{0}.csv"}
-environment_requirements = [																																\
-	("numpy", "global array, concatenate, shuffle\nfrom numpy import array, concatenate\nfrom numpy.random import shuffle", "Try to run \"pip install numpy\" to handle this issue. "), 																	\
-	("pandas", "global DF, read_csv, read_excel\nfrom pandas import DataFrame as DF, read_csv, read_excel", "Try to run \"pip install pandas\" to handle this issue. "), 																		\
-	("matplotlib", "global plt\nfrom matplotlib import pyplot as plt", "Try to run \"pip install matplotlib\" to handle this issue. "), 																						\
-	("sklearn", "global StandardScaler, MinMaxScaler\nfrom sklearn.preprocessing import StandardScaler, MinMaxScaler", "Try to install sklearn correctly. "), 																			\
-	("tensorflow", "global Activation, Dense, Dropout, GRU, load_model, LSTM, Sequential\nfrom tensorflow.python.keras.layers import Activation, Dense, Dropout\nfrom tensorflow.python.keras.layers.recurrent import GRU, LSTM\nfrom tensorflow.python.keras.models import load_model, Sequential", "Try to install tensorflow correctly. ")		\
+default_path_dict = {"modelFormat":"Model/{0}.h5", "imageFormat":"Image/{0}.png", "lossFormat":"Loss/{0}.csv", "resultFormat":"Result/{0}.csv"}
+environment_requirements = [																																									\
+	("numpy", "global arange, array, concatenate, shuffle, where\nfrom numpy import arange, array, concatenate, where\nfrom numpy.random import shuffle", "Try to run \"pip install numpy\" to handle this issue. "), 															\
+	("pandas", "global DF, read_csv, read_excel\nfrom pandas import DataFrame as DF, read_csv, read_excel", "Try to run \"pip install pandas\" to handle this issue. "), 																			\
+	("matplotlib", "global plt\nfrom matplotlib import pyplot as plt, use\nuse(\"Agg\")", "Try to run \"pip install matplotlib\" to handle this issue. "), 																					\
+	("sklearn", "global StandardScaler, MinMaxScaler\nfrom sklearn.preprocessing import StandardScaler, MinMaxScaler", "Try to install sklearn correctly. "), 																				\
+	("tensorflow", "global Activation, Dense, Dropout, GRU, load_model, LSTM, plot_model, Sequential\nfrom tensorflow.python.keras.layers import Activation, Dense, Dropout\nfrom tensorflow.python.keras.layers.recurrent import GRU, LSTM\nfrom tensorflow.python.keras.models import load_model, Sequential", "Try to install tensorflow correctly. ")		\
 ]
 isEnvironmentReady = False
-config = {"lag":12, "batch":1024, "epochs":10000, "validation_split":0.05}
+config = {"lag":12, "batch":1024, "epochs":1000, "validation_split":0.05}
 configIvs = {}
 parameter_entry_width = 10
+train_thread = None
 attrs = ("Time", "Value")
 controllers = {}
+test_dpi = 1200
+global_metrics = {"MAPE":(lambda r, p, n:sum((p - r) / r) / n), "RMSE":(lambda r, p, n:(sum((p - r) ** 2) / n) ** 0.5), "MSE":(lambda r, p, n:(sum(p - r) ** 2) / n), "SSE":(lambda r, p, n:sum((p - r) ** 2)), "MAE":(lambda r, p, n:sum(abs(p - r)) / n), "SSR":(lambda r, p, n:sum((p - sum(r) / n) ** 2)), "R2":(lambda r, p, n:1 - sum((p - r) ** 2) / sum((sum(r) / n - r) ** 2))}
+comparison_entry_width = 13
 
 
 # Class #
@@ -83,11 +89,11 @@ class GWO:
 			) / 3													\
 		)
 		self.learning_rate = abs(self.X[-1] - self.X[-2])
-	def fix(self, test, predict, lb = 0, ub = 1, layer = None):
+	def fix(self, real, predicted, lb = 0, ub = 1, layer = None):
 		if layer is None: # do not use gwo
-			return (test - predict) * self.get((lb, ub))
+			return (real - predicted) * self.get((lb, ub))
 		else:
-			return (test - predict) * self.get((layer, ))
+			return (real - predicted) * self.get((layer, ))
 	def get(self, target):
 		if "A" == target:
 			return self.lists[0]
@@ -114,7 +120,7 @@ class GWO:
 		else:
 			return None
 	def train_model(self, model, x_train, y_train, config):
-		model.compile(loss = "mse", optimizer = "rmsprop", metrics = ['mape'])
+		model.compile(loss = "mse", optimizer = "rmsprop", metrics = ["mape"])
 		print(x_train.shape, y_train.shape)
 		X = x_train.tolist()[0][0] # get initial
 		Y = y_train.tolist()
@@ -127,9 +133,9 @@ class GWO:
 		hist = model.fit(x_train, y_train, batch_size = config["batch"], epochs = config["epochs"], validation_split = config["validation_split"], verbose = 1)
 		model.save(modelPathSv.get())
 		if os.path.splitext(lossPath.lower())[1] in (".txt", ".csv"):
-			DF(hist.history).to_csv(lossPath)
+			DF(hist.history).to_csv(lossPathSv.get())
 		else:
-			DF(hist.history).to_excel(lossPath)
+			DF(hist.history).to_excel(lossPathSv.get())
 gwo = GWO(576, 0.4, 0.7, 0.9)
 
 class Model:
@@ -221,7 +227,7 @@ def checkAll(button) -> None:
 
 
 # Model Functions #
-def browse(entry, filetypes = [("All files", "*.*")], mustExist = False, isAppend = False) -> None:
+def browseFile(entry, filetypes = [("All files", "*.*")], mustExist = False, isAppend = False) -> None:
 	if mustExist:
 		pathString = askopenfilename(initialdir = os.path.abspath(os.path.dirname(__file__)), filetypes = filetypes)
 	else:
@@ -232,11 +238,21 @@ def browse(entry, filetypes = [("All files", "*.*")], mustExist = False, isAppen
 			pathString += exts[0]
 		if not isAppend:
 			entry.delete(0, END)
-		entry.insert(END, os.path.relpath(pathString, os.path.abspath(os.path.dirname(__file__))))
+		relpath = os.path.relpath(pathString, os.path.abspath(os.path.dirname(__file__)))
+		entry.insert(END, relpath if len(relpath) <= len(pathString) else pathString)
+
+def browseFolder(entry, isAppend = False) -> None:
+	pathString = askdirectory(initialdir = os.path.abspath(os.path.dirname(__file__)))
+	if pathString:
+		if not isAppend:
+			entry.delete(0, END)
+		relpath = os.path.relpath(pathString, os.path.abspath(os.path.dirname(__file__)))
+		entry.insert(END, relpath if len(relpath) <= len(pathString) else pathString)
 
 def onComboboxSelect(event) -> None:
 	mode = model_mode_combobox.get()
 	modelPathSv.set(default_path_dict["modelFormat"].format(mode))
+	imagePathSv.set(default_path_dict["imageFormat"].format(mode))
 	lossPathSv.set(default_path_dict["lossFormat"].format(mode))
 	resultPathSv.set(default_path_dict["resultFormat"].format(mode))
 
@@ -275,7 +291,7 @@ def handleFolder(folder) -> bool:
 		except:
 			return False
 
-def train(button, mode, encoding = "utf-8") -> bool:
+def train(button, encoding = "utf-8") -> bool:
 	# Check environment #
 	setControllersState(False)
 	tk.update()
@@ -301,7 +317,8 @@ def train(button, mode, encoding = "utf-8") -> bool:
 	button["fg"] = state_fg[0]
 	button["state"] = "normal"
 	tk.update()
-	modelPath, lossPath, trainPath = modelPathSv.get(), lossPathSv.get(), trainPathSv.get()
+	mode = model_mode_combobox.get()
+	modelPath, imagePath, trainPath, lossPath = modelPathSv.get(), imagePathSv.get(), trainPathSv.get(), lossPathSv.get()
 	
 	# Read data #
 	try:
@@ -310,7 +327,10 @@ def train(button, mode, encoding = "utf-8") -> bool:
 		else:
 			pf = read_excel(trainPath, encoding = encoding).fillna(0)
 		for attr in attrs:
-			if attr not in pf.columns:
+			if attr in pf.columns:
+				if len(pf[attr]) <= config["lag"]:
+					raise ValueError("The count of the data in Column \"{0}\" is not larger than lag. ".format(attr))
+			else:
 				raise ValueError("The specified file lacks a column named {0}. ".format(attr))
 	except Exception as e:
 		print("Failed reading training dataset. Details are as follows. \n{0}".format(e))
@@ -356,6 +376,21 @@ def train(button, mode, encoding = "utf-8") -> bool:
 			showerror("Error", "Failed saving the model. \nPlease refer to the command prompt window for details. \nPlease press enter key to " + ("retry (Remain: {0}). ".format(i) if i else "continue. "))
 	else:
 		bRet = False
+	try:
+		from tensorflow.keras.utils import plot_model
+	except:
+		from tensorflow.python.keras.utils.vis_utils import plot_model
+	for i in range(MAX_RETRY_COUNT - 1, -1, -1):
+		try:
+			handleFolder(os.path.split(imagePath)[0])
+			plot_model(model, to_file = imagePath, show_shapes = True, expand_nested = True)
+			print("The model image is successfully saved. ")
+			break
+		except Exception as e:
+			print("Failed saving the model image. Details are as follows. \n{0}\nPlease press enter key to ".format(e) + ("retry (Remain: {0}). ".format(i) if i else "continue. "))
+			showerror("Error", "Failed saving the model image. \nPlease refer to the command prompt window for details. \nPlease press enter key to " + ("retry (Remain: {0}). ".format(i) if i else "continue. "))
+	else:
+		bRet = False
 	for i in range(MAX_RETRY_COUNT - 1, -1, -1):
 		try:
 			handleFolder(os.path.split(lossPath)[0])
@@ -379,9 +414,21 @@ def train(button, mode, encoding = "utf-8") -> bool:
 	tk.update()
 	return bRet
 
+def doTrain(button) -> bool:
+	global train_thread
+	if train_thread is None or not train_thread.is_alive():
+		if train_thread is not None:
+			train_thread.join()
+		train_thread = Thread(target = train, args = (button, ))
+		train_thread.start()
+		return True
+	else:
+		showinfo("Information", "A training thread is already running. \nIf you want to suspend the thread, please mark the command prompt window. \nPlease press the enter key to continue. ")
+		return False
+
 
 # Test Functions #
-def test(button, mode, encoding = "utf-8") -> None:
+def test(button, encoding = "utf-8") -> None:
 	# Check environment #
 	setControllersState(False)
 	tk.update()
@@ -394,6 +441,7 @@ def test(button, mode, encoding = "utf-8") -> None:
 	button["fg"] = state_fg[0]
 	button["state"] = "normal"
 	tk.update()
+	mode = model_mode_combobox.get()
 	modelPath, lossPath, testPath, resultPath = modelPathSv.get(), lossPathSv.get(), testPathSv.get(), resultPathSv.get()
 	
 	# Read data #
@@ -403,7 +451,10 @@ def test(button, mode, encoding = "utf-8") -> None:
 		else:
 			pf = read_excel(testPath, encoding = encoding).fillna(0)
 		for attr in attrs:
-			if attr not in pf.columns:
+			if attr in pf.columns:
+				if len(pf[attr]) <= config["lag"]:
+					raise ValueError("The count of the data in Column \"{0}\" is not larger than lag. ".format(attr))
+			else:
 				raise ValueError("The specified file lacks a column named {0}. ".format(attr))
 	except Exception as e:
 		print("Failed reading testing dataset. Details are as follows. \n{0}".format(e))
@@ -427,16 +478,18 @@ def test(button, mode, encoding = "utf-8") -> None:
 	predicted = model.predict(x_test)
 	predicted = scaler.inverse_transform(predicted.reshape(-1, 1)).reshape(1, -1)[0]
 	bRet = True
+	n = predicted.shape[0]
+	values = concatenate((arange(1, n + 1, 1).reshape(n, 1), y_test.reshape(n, 1), predicted.reshape(n, 1)), axis = 1)
+	for i in range(n):
+		values[i, 2] = values[i, 2] + gwo.fix(values[i, 1], values[i, 2], layer = 1 if mode == "GWO-LSTM" else 2)
+	values = where(values < 1, 1, values)
 	for i in range(MAX_RETRY_COUNT - 1, -1, -1):
 		try:
-			values = concatenate((predicted.reshape(predicted.shape[0], 1), x_test.reshape(x_test.shape[0], x_test.shape[1])), axis = 1)
-			for j in range(1, values.shape[1]):
-				values[:, j] *= values[:, 0]
 			handleFolder(os.path.split(resultPath)[0])
 			if os.path.splitext(resultPath.lower())[1] in (".txt", ".csv"):
-				DF(values, columns = ["Real"] + ["Predicted (lag: {0})".format(lag) for lag in range(1, config["lag"] + 1)]).to_csv(resultPath)
+				DF(values, columns = ["Index", "Real", "Predicted"]).to_csv(resultPath, index = False)
 			else:
-				DF(values, columns = ["Real"] + ["Predicted (lag: {0})".format(lag) for lag in range(1, config["lag"] + 1)]).to_csv(resultPath)
+				DF(values, columns = ["Index", "Real", "Predicted"]).to_excel(resultPath, index = False)
 			print("The testing results are successfully saved. ")
 			break
 		except Exception as e:
@@ -454,6 +507,122 @@ def test(button, mode, encoding = "utf-8") -> None:
 	return bRet
 
 
+# Comparison Functions #
+def compare(button, encoding = "utf-8") -> None:
+	# Check environment #
+	setControllersState(False)
+	tk.update()
+	if not isEnvironmentReady:
+		showerror("Error", "The environment is not ready. Please check it in advance. ")
+		setControllersState(True)
+		tk.update()
+		return False
+	button["text"] = "Comparing"
+	button["fg"] = state_fg[0]
+	button["state"] = "normal"
+	tk.update()
+	testPath, inputPath, comparisonPath, plotPath = testPathSv.get(), inputPathSv.get(), comparisonPathSv.get(), plotPathSv.get()
+	
+	# Read data #
+	try:
+		if os.path.splitext(testPath.lower())[1] in (".txt", ".csv"):
+			pf = read_csv(testPath, encoding = encoding).fillna(0)
+		else:
+			pf = read_excel(testPath, encoding = encoding).fillna(0)
+		for attr in attrs:
+			if attr in pf.columns:
+				if len(pf[attr]) <= config["lag"]:
+					raise ValueError("The count of the data in Column \"{0}\" is not larger than lag. ".format(attr))
+			else:
+				raise ValueError("The specified file lacks a column named {0}. ".format(attr))
+	except Exception as e:
+		print("Failed reading testing dataset. Details are as follows. \n{0}".format(e))
+		showerror("Error", "Failed reading testing dataset. \nPlease refer to the command prompt window for details. ")
+		button["text"] = "Compare"
+		button["fg"] = state_fg[-1]
+		setControllersState(True)
+		tk.update()
+		return False
+	_, y_test, scaler = processData(pf)
+	y_test = scaler.inverse_transform(y_test.reshape(-1, 1)).reshape(1, -1)[0]
+	n = y_test.shape[0]
+	
+	# Walk data #
+	columns = ["Index", "Real"]
+	values = [list(range(1, n + 1)), y_test.tolist()]
+	for root, dirs, files in os.walk(inputPath):
+		for f in files:
+			if os.path.splitext(f.lower())[1] in (".txt", ".csv"):
+				try:
+					pf = read_csv(os.path.join(root, f))
+				except Exception as e:
+					print("Failed reading \"{0}\", which is skipped. Details are as follows. \n{1}".format(os.path.join(root, f), e))
+					continue
+			elif os.path.splitext(f.lower())[1] in (".xls", ".xlsx"):
+				try:
+					pf = read_excel(os.path.join(root, f))
+				except Exception as e:
+					print("Failed reading \"{0}\", which is skipped. Details are as follows. \n{1}".format(os.path.join(root, f), e))
+					continue
+			if "Predicted" in pf.columns and len(pf["Predicted"].tolist()) == n:
+				values.append(pf["Predicted"].tolist())
+				columns.append(os.path.splitext(f)[0])
+			else:
+				print("File \"{0}\" has been skipped since it has no \"Predicted\" attribute or the length is not equaled to {1}. ".format(os.path.join(root, f), n))
+	bRet = True
+	
+	# Plot results #
+	for value in values[1:]:
+		plt.plot(values[0], value)
+	plt.legend(columns[1:])
+	plt.rcParams["figure.dpi"] = test_dpi
+	plt.rcParams["savefig.dpi"] = test_dpi
+	for i in range(MAX_RETRY_COUNT - 1, -1, -1):
+		try:
+			handleFolder(os.path.split(plotPath)[0])
+			plt.savefig(plotPath)
+			print("The plot results are successfully saved. ")
+			break
+		except Exception as e:
+			print("Failed saving the plot results. Details are as follows. \n{0}\nPlease press enter key to ".format(e) + ("retry (Remain: {0}). ".format(i) if i else "continue. "))
+			showerror("Error", "Failed saving the plot results. \nPlease refer to the command prompt window for details. \nPlease press enter key to " + ("retry (Remain: {0}). ".format(i) if i else "continue. "))
+	else:
+		bRet = False
+	plt.close()
+	
+	# Compare results #
+	values = array(values).T
+	lines = []
+	for key in list(global_metrics.keys()):
+		lines.append([key])
+		for j in range(1, values.shape[1]):
+			lines[-1].append(global_metrics[key](values[:n, 1], values[:n, j], n)) # r, p, n
+	for line in lines:
+		values = concatenate((values, array(line).reshape(1, len(line))), axis = 0)
+	for i in range(MAX_RETRY_COUNT - 1, -1, -1):
+		try:
+			handleFolder(os.path.split(comparisonPath)[0])
+			if os.path.splitext(comparisonPath.lower())[1] in (".txt", ".csv"):
+				DF(values, columns = columns).to_csv(comparisonPath, index = False)
+			else:
+				DF(values, columns = columns).to_excel(comparisonPath, index = False)
+			print("The comparison results are successfully saved. ")
+			break
+		except Exception as e:
+			print("Failed saving the comparison results. Details are as follows. \n{0}\nPlease press enter key to ".format(e) + ("retry (Remain: {0}). ".format(i) if i else "continue. "))
+			showerror("Error", "Failed saving the comparison results. \nPlease refer to the command prompt window for details. \nPlease press enter key to " + ("retry (Remain: {0}). ".format(i) if i else "continue. "))
+	else:
+		bRet = False
+	
+	# Show information #
+	showinfo("Information", "Comparison finished successfully. " if bRet else "Comparison finished with errors or warnings. ")
+	button["text"] = "Compare"
+	button["fg"] = state_fg[1 if bRet else -1]
+	setControllersState(True)
+	tk.update()
+	return bRet
+
+
 # Main Functions #
 def main() -> int:
 	print("{0} - Beginning of Log - {1}".format(GLOBAL_TITLE, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
@@ -462,20 +631,19 @@ def main() -> int:
 	global tk
 	tk = Tk()
 	tk.title(GLOBAL_TITLE)
-	tk.geometry("928x522")
+	tk.geometry(tkDpi)
 	for key in list(config.keys()):
 		if key == "validation_split":
 			configIvs[key] = DoubleVar(value = config[key])
 		else:
 			configIvs[key] = IntVar(value = config[key])
-	global modelPathSv, lossPathSv, trainPathSv, testPathSv, resultPathSv
-	modelPathSv, lossPathSv, trainPathSv, testPathSv, resultPathSv = StringVar(value = "Model/GWO-LSTM.h5"), StringVar(value = "Loss/GWO-LSTM.csv"), StringVar(value = "Dataset/Train.csv"), StringVar(value = "Dataset/Test.csv"), StringVar(value = "Result/GWO-LSTM.csv")
+	global modelPathSv, imagePathSv, trainPathSv, lossPathSv, testPathSv, resultPathSv, inputPathSv, comparisonPathSv, plotPathSv
+	modelPathSv, imagePathSv, trainPathSv, lossPathSv, testPathSv, resultPathSv, inputPathSv, comparisonPathSv, plotPathSv = StringVar(value = "Model/GWO-LSTM.h5"), StringVar(value = "Image/GWO-LSTM.png"), StringVar(value = "Dataset/Train.csv"), StringVar(value = "Loss/GWO-LSTM.csv"), StringVar(value = "Dataset/Test.csv"), StringVar(value = "Result/GWO-LSTM.csv"), StringVar(value = "Result"), StringVar(value = "comparison.csv"), StringVar(value = "comparison.png")
 	
 	# Environment Part #
 	environment_frame = Frame(tk, relief = RAISED, borderwidth = 2, width = frame_width)
 	environment_frame.pack(side = TOP, fill = BOTH, ipadx = frame_pad, ipady = frame_pad, padx = frame_pad, pady = frame_pad)
-	environment_main_label = Label(environment_frame, text = "Environment", font = title_font, fg = title_fg)
-	environment_main_label.pack(side = TOP)
+	Label(environment_frame, text = "Environment", font = title_font, fg = title_fg).pack(side = TOP)
 	for t in environment_requirements:
 		Label(environment_frame, text = " " * common_gap_width, font = common_font).pack(side = LEFT)
 		Label(environment_frame, text = t[0], font = common_font).pack(side = LEFT)
@@ -500,8 +668,7 @@ def main() -> int:
 	model_frame.pack(side = TOP, fill = BOTH, ipadx = frame_pad, ipady = frame_pad, padx = frame_pad, pady = frame_pad)
 	Label(model_frame, text = "Model", font = title_font, fg = title_fg).pack(side = TOP)
 	Label(model_frame, text = " " * common_gap_width, font = common_font).pack(side = LEFT)
-	model_mode_label = Label(model_frame, text = "Mode: ", font = common_font)
-	model_mode_label.pack(side = LEFT)
+	Label(model_frame, text = "Mode: ", font = common_font).pack(side = LEFT)
 	global model_mode_combobox
 	model_mode_combobox = Combobox(model_frame, height = 4, width = 15, values = ("LSTM", "GWO-LSTM", "GRU", "SAES"), state = "readonly", font = common_font)
 	model_mode_combobox.current(1)
@@ -509,58 +676,62 @@ def main() -> int:
 	model_mode_combobox.pack(side = LEFT)
 	controllers[model_mode_combobox] = "readonly"
 	Label(model_frame, text = " " * common_gap_width, font = common_font).pack(side = LEFT)
-	model_path_label = Label(model_frame, text = "Model path: ", font = common_font)
-	model_path_label.pack(side = LEFT)
+	Label(model_frame, text = "Model path: ", font = common_font).pack(side = LEFT)
 	model_path_entry = Entry(model_frame, width = common_entry_width, textvariable = modelPathSv, font = common_font)
 	model_path_entry.pack(side = LEFT)
 	controllers[model_path_entry] = "normal"
 	Label(model_frame, text = " ", font = common_font).pack(side = LEFT)
-	model_path_button = Button(model_frame, text = " .. ", command = lambda:browse(model_path_entry, filetypes = [("Model Files", "*.h5")]), font = common_font, fg = state_fg[None])
+	model_path_button = Button(model_frame, text = " .. ", command = lambda:browseFile(model_path_entry, filetypes = [("Model Files", "*.h5")]), font = common_font, fg = state_fg[None])
 	model_path_button.pack(side = LEFT)
 	controllers[model_path_button] = "normal"
 	Label(model_frame, text = " " * common_gap_width, font = common_font).pack(side = LEFT)
-	model_loss_label = Label(model_frame, text = "Loss path: ", font = common_font)
-	model_loss_label.pack(side = LEFT)
-	model_loss_entry = Entry(model_frame, width = common_entry_width, textvariable = lossPathSv, font = common_font)
-	model_loss_entry.pack(side = LEFT)
-	controllers[model_loss_entry] = "normal"
+	Label(model_frame, text = "Model image path: ", font = common_font).pack(side = LEFT)
+	model_image_entry = Entry(model_frame, width = common_entry_width, textvariable = imagePathSv, font = common_font)
+	model_image_entry.pack(side = LEFT)
+	controllers[model_image_entry] = "normal"
 	Label(model_frame, text = " ", font = common_font).pack(side = LEFT)
-	model_loss_button = Button(model_frame, text = " .. ", command = lambda:browse(model_loss_entry, filetypes = [("CSV Files", "*.csv"), ("Excel Files", "*.xlsx")]), font = common_font, fg = state_fg[None])
-	model_loss_button.pack(side = LEFT)
-	controllers[model_loss_button] = "normal"
+	model_image_button = Button(model_frame, text = " .. ", command = lambda:browseFile(model_image_entry, filetypes = [("PNG Files", "*.png"), ("JPG Files", "*.jpg"), ("JPEG Files", "*.jpeg")]), font = common_font, fg = state_fg[None])
+	model_image_button.pack(side = LEFT)
+	controllers[model_path_button] = "normal"
 	
 	# Training Part #
 	train_frame = Frame(tk, relief = RAISED, borderwidth = 2, width = frame_width)
 	train_frame.pack(side = TOP, fill = BOTH, ipadx = frame_pad, ipady = frame_pad, padx = frame_pad, pady = frame_pad)
-	train_main_label = Label(train_frame, text = "Train", font = title_font, fg = title_fg)
-	train_main_label.pack(side = TOP)
+	Label(train_frame, text = "Train", font = title_font, fg = title_fg).pack(side = TOP)
 	Label(train_frame, text = " " * common_gap_width, font = common_font).pack(side = LEFT)
-	train_path_label = Label(train_frame, text = "Training dataset path: ", font = common_font)
-	train_path_label.pack(side = LEFT)
+	Label(train_frame, text = "Training dataset path: ", font = common_font).pack(side = LEFT)
 	train_path_entry = Entry(train_frame, width = common_entry_width, textvariable = trainPathSv, font = common_font)
 	train_path_entry.pack(side = LEFT)
 	controllers[train_path_entry] = "normal"
 	Label(train_frame, text = " ", font = common_font).pack(side = LEFT)
-	train_path_button = Button(train_frame, text = " .. ", command = lambda:browse(train_path_entry, filetypes = [("CSV Files", "*.csv"), ("Excel Files", "*.xlsx")], mustExist = True), font = common_font, fg = state_fg[None])
+	train_path_button = Button(train_frame, text = " .. ", command = lambda:browseFile(train_path_entry, filetypes = [("CSV Files", "*.csv"), ("Excel Files", "*.xlsx")], mustExist = True), font = common_font, fg = state_fg[None])
 	train_path_button.pack(side = LEFT)
 	controllers[train_path_button] = "normal"
+	Label(train_frame, text = " " * common_gap_width, font = common_font).pack(side = LEFT)
+	Label(train_frame, text = "Loss path: ", font = common_font).pack(side = LEFT)
+	train_loss_entry = Entry(train_frame, width = common_entry_width, textvariable = lossPathSv, font = common_font)
+	train_loss_entry.pack(side = LEFT)
+	controllers[train_loss_entry] = "normal"
+	Label(train_frame, text = " ", font = common_font).pack(side = LEFT)
+	train_loss_button = Button(train_frame, text = " .. ", command = lambda:browseFile(train_loss_entry, filetypes = [("CSV Files", "*.csv"), ("Excel Files", "*.xlsx")]), font = common_font, fg = state_fg[None])
+	train_loss_button.pack(side = LEFT)
+	controllers[train_loss_button] = "normal"
 	Label(train_frame, text = " " * common_gap_width, font = common_font).pack(side = RIGHT)
-	train_main_button = Button(train_frame, text = "Train", command = lambda:train(train_main_button, model_mode_combobox.get()), font = common_font, fg = state_fg[0])
+	train_main_button = Button(train_frame, text = "Train", command = lambda:doTrain(train_main_button), font = common_font, fg = state_fg[0])
 	train_main_button.pack(side = RIGHT)
 	controllers[train_main_button] = "normal"
 		
 	# Testing Part #
 	test_frame = Frame(tk, relief = RAISED, borderwidth = 2, width = frame_width)
 	test_frame.pack(side = TOP, fill = BOTH, ipadx = frame_pad, ipady = frame_pad, padx = frame_pad, pady = frame_pad)
-	test_main_label = Label(test_frame, text = "Test", font = title_font, fg = title_fg)
-	test_main_label.pack(side = TOP)
+	Label(test_frame, text = "Test", font = title_font, fg = title_fg).pack(side = TOP)
 	Label(test_frame, text = " " * common_gap_width, font = common_font).pack(side = LEFT)
 	Label(test_frame, text = "Testing dataset path: ", font = common_font).pack(side = LEFT)
 	test_path_entry = Entry(test_frame, width = common_entry_width, textvariable = testPathSv, font = common_font)
 	test_path_entry.pack(side = LEFT)
 	controllers[test_path_entry] = "normal"
 	Label(test_frame, text = " ", font = common_font).pack(side = LEFT)
-	test_path_button = Button(test_frame, text = " .. ", command = lambda:browse(test_path_entry, filetypes = [("CSV Files", "*.csv"), ("Excel Files", "*.xlsx")], mustExist = True), font = common_font, fg = state_fg[None])
+	test_path_button = Button(test_frame, text = " .. ", command = lambda:browseFile(test_path_entry, filetypes = [("CSV Files", "*.csv"), ("Excel Files", "*.xlsx")], mustExist = True), font = common_font, fg = state_fg[None])
 	test_path_button.pack(side = LEFT)
 	controllers[test_path_button] = "normal"
 	Label(test_frame, text = " " * common_gap_width, font = common_font).pack(side = LEFT)
@@ -569,18 +740,60 @@ def main() -> int:
 	test_result_entry.pack(side = LEFT)
 	controllers[test_result_entry] = "normal"
 	Label(test_frame, text = " ", font = common_font).pack(side = LEFT)
-	test_result_button = Button(test_frame, text = " .. ", command = lambda:browse(test_result_entry, filetypes = [("CSV Files", "*.csv"), ("Excel Files", "*.xlsx")]), font = common_font, fg = state_fg[None])
+	test_result_button = Button(test_frame, text = " .. ", command = lambda:browseFile(test_result_entry, filetypes = [("CSV Files", "*.csv"), ("Excel Files", "*.xlsx")]), font = common_font, fg = state_fg[None])
 	test_result_button.pack(side = LEFT)
 	controllers[test_result_button] = "normal"
 	Label(test_frame, text = " " * common_gap_width, font = common_font).pack(side = RIGHT)
-	test_main_button = Button(test_frame, text = "Test", command = lambda:test(test_main_button, model_mode_combobox.get()), font = common_font, fg = state_fg[0])
+	test_main_button = Button(test_frame, text = "Test", command = lambda:test(test_main_button), font = common_font, fg = state_fg[0])
 	test_main_button.pack(side = RIGHT)
 	controllers[test_main_button] = "normal"
+	
+	# Comparison Part #
+	comparison_frame = Frame(tk, relief = RAISED, borderwidth = 2, width = frame_width)
+	comparison_frame.pack(side = TOP, fill = BOTH, ipadx = frame_pad, ipady = frame_pad, padx = frame_pad, pady = frame_pad)
+	Label(comparison_frame, text = "Comparison", font = title_font, fg = title_fg).pack(side = TOP)
+	Label(comparison_frame, text = " " * common_gap_width, font = common_font).pack(side = LEFT)
+	Label(comparison_frame, text = "Input folder: ", font = common_font).pack(side = LEFT)
+	comparison_input_entry = Entry(comparison_frame, width = comparison_entry_width, textvariable = inputPathSv, font = common_font)
+	comparison_input_entry.pack(side = LEFT)
+	controllers[comparison_input_entry] = "normal"
+	Label(comparison_frame, text = " ", font = common_font).pack(side = LEFT)
+	comparison_input_button = Button(comparison_frame, text = " .. ", command = lambda:browseFolder(comparison_input_entry), font = common_font, fg = state_fg[None])
+	comparison_input_button.pack(side = LEFT)
+	controllers[comparison_input_button] = "normal"
+	Label(comparison_frame, text = " " * common_gap_width, font = common_font).pack(side = LEFT)
+	Label(comparison_frame, text = "Comparison result path: ", font = common_font).pack(side = LEFT)
+	comparison_result_entry = Entry(comparison_frame, width = comparison_entry_width, textvariable = comparisonPathSv, font = common_font)
+	comparison_result_entry.pack(side = LEFT)
+	controllers[comparison_result_entry] = "normal"
+	Label(comparison_frame, text = " ", font = common_font).pack(side = LEFT)
+	comparison_result_button = Button(comparison_frame, text = " .. ", command = lambda:browseFile(comparison_result_entry, filetypes = [("CSV Files", "*.csv"), ("Excel Files", "*.xlsx")]), font = common_font, fg = state_fg[None])
+	comparison_result_button.pack(side = LEFT)
+	controllers[comparison_result_button] = "normal"
+	Label(comparison_frame, text = " " * common_gap_width, font = common_font).pack(side = LEFT)
+	Label(comparison_frame, text = "Plot result path: ", font = common_font).pack(side = LEFT)
+	comparison_plot_entry = Entry(comparison_frame, width = comparison_entry_width, textvariable = plotPathSv, font = common_font)
+	comparison_plot_entry.pack(side = LEFT)
+	controllers[comparison_plot_entry] = "normal"
+	Label(comparison_frame, text = " ", font = common_font).pack(side = LEFT)
+	comparison_plot_button = Button(comparison_frame, text = " .. ", command = lambda:browseFile(comparison_plot_entry, filetypes = [("PNG Files", "*.png"), ("JPG Files", "*.jpg"), ("JPEG Files", "*.jpeg")]), font = common_font, fg = state_fg[None])
+	comparison_plot_button.pack(side = LEFT)
+	controllers[comparison_plot_button] = "normal"
+	Label(comparison_frame, text = " " * common_gap_width, font = common_font).pack(side = RIGHT)
+	comparison_main_button = Button(comparison_frame, text = "Compare", command = lambda:compare(comparison_main_button), font = common_font, fg = state_fg[0])
+	comparison_main_button.pack(side = RIGHT)
+	controllers[comparison_main_button] = "normal"
 	
 	# Main  Window #
 	tk.mainloop()
 	print("{0} - End of Log - {1}".format(GLOBAL_TITLE, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-	return EXIT_SUCCESS
+	if train_thread is not None and train_thread.is_alive(): # force to exit
+		os._exit(EXIT_FAILURE)
+		return EXIT_FAILURE # dead code
+	else:
+		if train_thread is not None:
+			train_thread.join()
+		return EXIT_SUCCESS
 
 
 
