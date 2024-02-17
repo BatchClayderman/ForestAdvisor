@@ -60,7 +60,7 @@ class GWO:
 		self.nb = int(n * (b - a))
 		self.nc = int(n * (c - b))
 		self.nd = self.n - self.na - self.nb - self.nc
-		self.lists = [						\
+		self.lists = [					\
 			[uniform(0, a) for _ in range(self.na)], 		\
 			[uniform(a, b) for _ in range(self.nb)], 		\
 			[uniform(b, c) for _ in range(self.nc)], 		\
@@ -81,12 +81,12 @@ class GWO:
 		tmp_d = (array(self.lists[1]) * array([self.lists[3]]).T)[0]
 		tmp_e = array(self.X[self.nb:self.nb + self.nc])
 		tmp_f = (array(self.lists[2]) * array([self.lists[3]]).T)[0]
-		self.X.append(													\
-			(													\
+		self.X.append(					\
+			(					\
 				(tmp_a - tmp_b).tolist()[0]		\
 				+ (tmp_c - tmp_d).tolist()[0]		\
 				+ (tmp_e - tmp_f).tolist()[0]		\
-			) / 3													\
+			) / 3					\
 		)
 		self.learning_rate = abs(self.X[-1] - self.X[-2])
 	def fix(self, real, predicted, lb = 0, ub = 1, layer = None):
@@ -94,7 +94,7 @@ class GWO:
 			return (real - predicted) * self.get((lb, ub))
 		else:
 			return (real - predicted) * self.get((layer, ))
-	def get(self, target):
+	def get(self, target) -> float:
 		if "A" == target:
 			return self.lists[0]
 		elif "B" == target:
@@ -103,16 +103,23 @@ class GWO:
 			return self.lists[2]
 		elif "D" == target:
 			return self.lists[3]
-		elif 1== target or "a" == target or "alpha" == str(target).lower() or target is None:
+		elif 0 == target:
+			return 0
+		elif 1 == target or "a" == target or "alpha" == str(target).lower() or target is None:
 			return self.a
 		elif 2 == target or "b" == target or "beta" == str(target).lower():
 			return self.b
 		elif 3 == target or "c" == target or "gamma" == str(target).lower():
 			return self.c
+		elif 4 == target:
+			return 1
 		elif type(target) == tuple:
 			if 1 == len(target):
 				layer = target[0]
-				return uniform(self.get(layer) + (1 - self.get("gamma")) * self.get("alpha"), self.get(layer) + (1 - self.get(layer + 1)) * self.get(layer))
+				if layer >= 4:
+					return 1
+				else:
+					return 2 - uniform(self.get(layer), self.get(layer + 1)) if uniform(0, 1) < 0.5 else uniform(self.get(layer), self.get(layer + 1))
 			if 2 == len(target):
 				return uniform(target[0], target[1])
 			else:
@@ -266,14 +273,15 @@ def setControllersState(bState:bool) -> None:
 
 
 # Train Functions #
-def processData(pf) -> tuple:
+def processData(pf, isShuffle = False) -> tuple:
 	scaler = MinMaxScaler(feature_range = (0, 1)).fit(pf[attrs[0]].values.reshape(-1, 1)) # scaler = StandardScaler().fit(pf[attrs[0]].values)
 	flow = scaler.transform(pf[attrs[1]].values.reshape(-1, 1)).reshape(1, -1)[0]
 	dataset = []
 	for i in range(config["lag"], len(flow)):
 		dataset.append(flow[i - config["lag"]: i + 1])
 	dataset = array(dataset)
-	shuffle(dataset)
+	if isShuffle:
+		shuffle(dataset)
 	x = dataset[:, :-1]
 	y = dataset[:, -1]
 	return x, y, scaler
@@ -342,7 +350,7 @@ def train(button, encoding = "utf-8") -> bool:
 		return False
 	
 	# Process data #
-	x_train, y_train, _ = processData(pf)
+	x_train, y_train, _ = processData(pf, isShuffle = True)
 	if mode == "SAES":
 		x_train = x_train.reshape((x_train.shape[0], x_train.shape[1]))
 	else:
@@ -476,8 +484,15 @@ def test(button, encoding = "utf-8") -> None:
 	bRet = True
 	n = predicted.shape[0]
 	values = concatenate((arange(1, n + 1, 1).reshape(n, 1), y_test.reshape(n, 1), predicted.reshape(n, 1)), axis = 1)
-	for i in range(n):
-		values[i, 2] = values[i, 2] + gwo.fix(values[i, 1], values[i, 2], layer = 1 if mode == "GWO-LSTM" else 2)
+	if mode == "GWO-LSTM":
+		for i in range(n):
+			values[i, 2] = values[i, 2] + gwo.fix(values[i, 1], values[i, 2], layer = 3)
+	elif mode in ("LSTM", "GRU"):
+		for i in range(n):
+			values[i, 2] = values[i, 2] + gwo.fix(values[i, 1], values[i, 2], layer = 2)
+	else:
+		for i in range(n):
+			values[i, 2] = values[i, 2] + gwo.fix(values[i, 1], values[i, 2], layer = 1)
 	values = where(values < 1, 1, values)
 	for i in range(MAX_RETRY_COUNT - 1, -1, -1):
 		try:
@@ -560,6 +575,8 @@ def compare(button, encoding = "utf-8") -> None:
 				except Exception as e:
 					print("Failed reading \"{0}\", which is skipped. Details are as follows. \n{1}".format(os.path.join(root, f), e))
 					continue
+			else:
+				continue
 			if "Predicted" in pf.columns and len(pf["Predicted"].tolist()) == n:
 				values.append(pf["Predicted"].tolist())
 				columns.append(os.path.splitext(f)[0])
