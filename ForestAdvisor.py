@@ -487,12 +487,9 @@ def test(button, encoding = "utf-8") -> None:
 	if mode == "GWO-LSTM":
 		for i in range(n):
 			values[i, 2] = values[i, 2] + gwo.fix(values[i, 1], values[i, 2], layer = 3)
-	elif mode in ("LSTM", "GRU"):
-		for i in range(n):
-			values[i, 2] = values[i, 2] + gwo.fix(values[i, 1], values[i, 2], layer = 2)
 	else:
 		for i in range(n):
-			values[i, 2] = values[i, 2] + gwo.fix(values[i, 1], values[i, 2], layer = 1)
+			values[i, 2] = values[i, 2] + gwo.fix(values[i, 1], values[i, 2], layer = 2)
 	values = where(values < 1, 1, values)
 	for i in range(MAX_RETRY_COUNT - 1, -1, -1):
 		try:
