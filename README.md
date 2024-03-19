@@ -2,7 +2,9 @@
 
 ForestAdvisor is a system for collecting, selecting, and optimizing forest management plans. The system contains the UWC part and the CarbonPredictor part. 
 
-## UWC
+## Natural Language Processing Model
+
+### UWC
 
 This repo contains a part of the UWC. Please visit [https://github.com/BatchClayderman/UWC](https://github.com/BatchClayderman/UWC) for details. 
 
