@@ -582,9 +582,14 @@ def compare(button, encoding = "utf-8") -> None:
 	bRet = True
 	
 	# Plot results #
+	plt.rcParams["figure.dpi"] = 300
+	plt.rcParams["savefig.dpi"] = 300
+	plt.rcParams["font.family"] = "Times New Roman"
 	for value in values[1:]:
 		plt.plot(values[0], value)
 	plt.legend(columns[1:])
+	plt.xlabel("Time (day)")
+	plt.ylabel("Carbon emission (Mt)")
 	plt.rcParams["figure.dpi"] = figure_dpi
 	plt.rcParams["savefig.dpi"] = figure_dpi
 	for i in range(MAX_RETRY_COUNT - 1, -1, -1):
