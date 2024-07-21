@@ -8,7 +8,7 @@ This part contains parts of codes from the UWC and the Bert.
 
 ### UWC
 
-Parts of codes from the UWC are contained. Please visit [https://github.com/BatchClayderman/UWC](https://github.com/BatchClayderman/UWC) for details. 
+Some codes from the UWC are contained. Please visit [https://github.com/BatchClayderman/UWC](https://github.com/BatchClayderman/UWC) for details. 
 
 ### Bert
 
@@ -17,6 +17,10 @@ A trained Bert model is contained.
 ## Carbon Prediction Part
 
 This part contains software named ``CarbonPredictor`` for predicting carbon values. 
+
+### ARIMA
+
+This is the baseline suggested for the research. 
 
 ### CarbonPredictor
 
