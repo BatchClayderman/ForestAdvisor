@@ -1,5 +1,6 @@
 import os
 from datetime import datetime
+from itertools import product
 from random import uniform
 from threading import Thread
 from tkinter import BOTH, Button, DoubleVar, END, Entry, Frame, IntVar, Label, LEFT, messagebox, RAISED, RIGHT, StringVar, Tk, TOP
@@ -15,7 +16,7 @@ EXIT_FAILURE = 1
 EOF = (-1)
 GLOBAL_TITLE = "CarbonPredictor"
 MAX_RETRY_COUNT = 3
-tkDpi = "960x540"
+tkDpi = "1040x585"
 frame_width = 36
 frame_pad = 5
 title_font = ("Times New Roman", 16, "bold")
@@ -24,16 +25,17 @@ common_font = ("Times New Roman", 12)
 common_gap_width = 3
 common_entry_width = 24
 state_fg = {None:"black", -1:"orange", 0:"blue", 1:"#00EE00"}
-default_path_dict = {"modelFormat":"Model/{0}.h5", "imageFormat":"Image/{0}.png", "lossFormat":"Loss/{0}.csv", "resultFormat":"Result/{0}.csv"}
+default_path_dict = {"modelFormat":"Model/{0}.h5", "pickleModelFormat":"Model/{0}.pkl", "imageFormat":"Image/{0}.png", "lossFormat":"Loss/{0}.csv", "pickleLossFormat":"Loss/{0}.txt", "resultFormat":"Result/{0}.csv"}
 environment_requirements = [																																					\
 	("numpy", "global arange, array, concatenate, shuffle, where\nfrom numpy import arange, array, concatenate, where\nfrom numpy.random import shuffle", "Try to run \"pip install numpy\" to handle this issue. "), 																			\
-	("pandas", "global DF, read_csv, read_excel\nfrom pandas import DataFrame as DF, read_csv, read_excel", "Try to run \"pip install pandas\" to handle this issue. "), 																							\
+	("pandas", "global DF, read_csv, read_excel, to_datetime\nfrom pandas import DataFrame as DF, read_csv, read_excel, to_datetime", "Try to run \"pip install pandas\" to handle this issue. "), 																					\
 	("matplotlib", "global plt\nfrom matplotlib import pyplot as plt, use\nuse(\"Agg\")", "Try to run \"pip install matplotlib\" to handle this issue. "), 																									\
 	("sklearn", "global StandardScaler, MinMaxScaler\nfrom sklearn.preprocessing import StandardScaler, MinMaxScaler", "Try to install sklearn correctly. "), 																								\
-	("tensorflow", "global Activation, Dense, Dropout, GRU, load_model, LSTM, plot_model, Sequential\nfrom tensorflow.python.keras.layers import Activation, Dense, Dropout\nfrom tensorflow.python.keras.layers.recurrent import GRU, LSTM\nfrom tensorflow.python.keras.models import load_model, Sequential\nfrom tensorflow.keras.utils import plot_model", "Try to install tensorflow correctly. ")		\
+	("tensorflow", "global Activation, Dense, Dropout, GRU, load_model, LSTM, plot_model, Sequential\nfrom tensorflow.python.keras.layers import Activation, Dense, Dropout\nfrom tensorflow.python.keras.layers.recurrent import GRU, LSTM\nfrom tensorflow.python.keras.models import load_model, Sequential\nfrom tensorflow.keras.utils import plot_model", "Try to install tensorflow correctly. "), 	\
+	("statsmodels", "global sm\nimport statsmodels.api as sm", "Try to install statsmodels correctly. ")																														\
 ]
 isEnvironmentReady = False
-config = {"lag":12, "batch":1024, "epochs":10000, "validation_split":0.05}
+config = {"lag":12, "batch":1024, "epochs":1000, "validation_split":0.05}
 configIvs = {}
 parameter_entry_width = 10
 train_thread = None
@@ -145,20 +147,62 @@ class GWO:
 			DF(hist.history).to_excel(lossPathSv.get())
 gwo = GWO(576, 0.4, 0.7, 0.9)
 
+class ARIMA:
+	def __init__(self:object):
+		pass
+	def compile(self:object, q = range(0, 2), d = range(0, 2), p = range(0, 4)) -> object:
+		self.pdq = list(product(p, d, q))
+		self.seasonal_pdq = [(x[0], x[1], x[2], 12) for x in self.pdq]
+	def fit(self:object, train_data:object) -> object:
+		AIC = []
+		SARIMAX_model = []
+		for param in self.pdq:
+			for param_seasonal in self.seasonal_pdq:
+				try:
+					mod = sm.tsa.statespace.SARIMAX(		\
+						train_data, 			\
+						order = param, 			\
+						seasonal_order = param_seasonal, 	\
+						enforce_stationarity = False, 		\
+						enforce_invertibility = False		\
+					)
+					results = mod.fit()
+					print("SARIMAX{}x{} - AIC:{}".format(param, param_seasonal, results.aic), end = "\r")
+					AIC.append(results.aic)
+					SARIMAX_model.append([param, param_seasonal])
+				except:
+					continue
+		print("The smallest AIC is {0} for model SARIMAX{1}x{2}".format(min(AIC), SARIMAX_model[AIC.index(min(AIC))][0],SARIMAX_model[AIC.index(min(AIC))][1]))
+		mod = sm.tsa.statespace.SARIMAX(					\
+			train_data, 						\
+			order = SARIMAX_model[AIC.index(min(AIC))][0], 		\
+			seasonal_order = SARIMAX_model[AIC.index(min(AIC))][1], 		\
+			enforce_stationarity = False, 					\
+			enforce_invertibility = False					\
+		)
+		results = mod.fit()
+		self.results = results
+		return self.results
+	def save(self:object, savePath:str) -> bool:
+		self.results.save(savePath)
+	def load_model(self:object, modelPath:str) -> bool:
+		self.results = sm.load_pickle(modelPath)
+	def predict(self:object, pf:object) -> object:
+		return self.results.forecast(len(pf) - config["lag"]).values
+
 class Model:
-	@staticmethod
-	def getLstm(units:list):
-		model = Sequential()
-		model.add(LSTM(units[1], input_shape = (units[0], 1), return_sequences = True))
-		model.add(LSTM(units[2]))
-		model.add(Dropout(0.2))
-		model.add(Dense(units[3], activation = "sigmoid"))
-		return model
 	@staticmethod
 	def getGru(units:list):
 		model = Sequential()
 		model.add(GRU(units[1], input_shape=(units[0], 1), return_sequences = True))
 		model.add(GRU(units[2]))
+		model.add(Dropout(0.2))
+		model.add(Dense(units[3], activation = "sigmoid"))
+		return model
+	def getLstm(units:list):
+		model = Sequential()
+		model.add(LSTM(units[1], input_shape = (units[0], 1), return_sequences = True))
+		model.add(LSTM(units[2]))
 		model.add(Dropout(0.2))
 		model.add(Dense(units[3], activation = "sigmoid"))
 		return model
@@ -258,9 +302,9 @@ def browseFolder(entry, isAppend = False) -> None:
 
 def onComboboxSelect(event) -> None:
 	mode = model_mode_combobox.get()
-	modelPathSv.set(default_path_dict["modelFormat"].format(mode))
+	modelPathSv.set(default_path_dict["pickleModelFormat"].format(mode) if mode == "ARIMA" else default_path_dict["modelFormat"].format(mode))
 	imagePathSv.set(default_path_dict["imageFormat"].format(mode))
-	lossPathSv.set(default_path_dict["lossFormat"].format(mode))
+	lossPathSv.set(default_path_dict["pickleLossFormat"].format(mode) if mode == "ARIMA" else default_path_dict["lossFormat"].format(mode))
 	resultPathSv.set(default_path_dict["resultFormat"].format(mode))
 
 def setControllersState(bState:bool) -> None:
@@ -273,7 +317,10 @@ def setControllersState(bState:bool) -> None:
 
 
 # Train Functions #
-def processData(pf, isShuffle = False) -> tuple:
+def processData(pf:object, isARIMA:bool = False, isShuffle:bool = False) -> tuple:
+	if pf[attrs[1]].mean() < 10:
+		pf[attrs[1]] *= 1000 # enhance data
+	pf[attrs[0]] = to_datetime(pf[attrs[0]], format = "%Y/%m/%d") if isARIMA else arange(1, len(pf[attrs[0]]) + 1, 1)
 	scaler = MinMaxScaler(feature_range = (0, 1)).fit(pf[attrs[0]].values.reshape(-1, 1)) # scaler = StandardScaler().fit(pf[attrs[0]].values)
 	flow = scaler.transform(pf[attrs[1]].values.reshape(-1, 1)).reshape(1, -1)[0]
 	dataset = []
@@ -286,7 +333,7 @@ def processData(pf, isShuffle = False) -> tuple:
 	y = dataset[:, -1]
 	return x, y, scaler
 
-def handleFolder(folder) -> bool:
+def handleFolder(folder:str) -> bool:
 	if os.path.exists(folder):
 		if os.path.isdir(folder):
 			return True
@@ -341,7 +388,7 @@ def train(button, encoding = "utf-8") -> bool:
 			else:
 				raise ValueError("The specified file lacks a column named {0}. ".format(attr))
 	except Exception as e:
-		print("Failed reading training dataset. Details are as follows. \n{0}".format(e))
+		print("Train: Failed reading training dataset. Details are as follows. \n{0}".format(e))
 		showerror("Error", "Failed reading training dataset. \nPlease refer to the command prompt window for details. ")
 		button["text"] = "Train"
 		button["fg"] = state_fg[-1]
@@ -350,15 +397,26 @@ def train(button, encoding = "utf-8") -> bool:
 		return False
 	
 	# Process data #
-	x_train, y_train, _ = processData(pf, isShuffle = True)
-	if mode == "SAES":
-		x_train = x_train.reshape((x_train.shape[0], x_train.shape[1]))
-	else:
-		x_train = x_train.reshape((x_train.shape[0], x_train.shape[1], 1))
-	if mode in ("LSTM", "GWO-LSTM"):
-		model = Model.getLstm([12, 64, 64, 1])
+	try:
+		x_train, y_train, _ = processData(pf, isARIMA = mode == "ARIMA", isShuffle = True)
+		if mode == "SAES":
+			x_train = x_train.reshape((x_train.shape[0], x_train.shape[1]))
+		else:
+			x_train = x_train.reshape((x_train.shape[0], x_train.shape[1], 1))
+	except Exception as e:
+		print("Train: Failed processing data. Details are as follows. \n{0}".format(e))
+		showerror("Error", "Failed processing data. \nPlease refer to the command prompt window for details. ")
+		button["text"] = "Train"
+		button["fg"] = state_fg[-1]
+		setControllersState(True)
+		tk.update()
+		return False
+	if mode == "ARIMA":
+		model = ARIMA()
 	elif mode == "GRU":
 		model = Model.getGru([12, 64, 64, 1])
+	elif mode in ("GWO-LSTM", "LSTM"):
+		model = Model.getLstm([12, 64, 64, 1])
 	elif mode == "SAES":
 		model = Model.getSaes([12, 400, 400, 400, 1])[-1]
 	else:
@@ -370,8 +428,12 @@ def train(button, encoding = "utf-8") -> bool:
 		return False
 	
 	# Train model #
-	model.compile(loss = "mse", optimizer = "rmsprop", metrics = ["mape"])
-	hist = model.fit(x_train, y_train, batch_size = config["batch"], epochs = config["epochs"], validation_split = config["validation_split"], verbose = 1)
+	if mode == "ARIMA":
+		model.compile(q = range(0, 2), d = range(0, 2), p = range(0, 4))
+		hist = model.fit(pf.set_index([attrs[0]], inplace = False))
+	else:
+		model.compile(loss = "mse", optimizer = "rmsprop", metrics = ["mape"])
+		hist = model.fit(x_train, y_train, batch_size = config["batch"], epochs = config["epochs"], validation_split = config["validation_split"], verbose = 1)
 	bRet = True
 	for i in range(MAX_RETRY_COUNT - 1, -1, -1):
 		try:
@@ -380,32 +442,37 @@ def train(button, encoding = "utf-8") -> bool:
 			print("The model is successfully saved. ")
 			break
 		except Exception as e:
-			print("Failed saving the model. Details are as follows. \n{0}\nPlease press enter key to ".format(e) + ("retry (Remain: {0}). ".format(i) if i else "continue. "))
+			print("Train: Failed saving the model. Details are as follows. \n{0}\nPlease press enter key to ".format(e) + ("retry (Remain: {0}). ".format(i) if i else "continue. "))
 			showerror("Error", "Failed saving the model. \nPlease refer to the command prompt window for details. \nPlease press enter key to " + ("retry (Remain: {0}). ".format(i) if i else "continue. "))
 	else:
 		bRet = False
-	for i in range(MAX_RETRY_COUNT - 1, -1, -1):
-		try:
-			handleFolder(os.path.split(imagePath)[0])
-			plot_model(model, to_file = imagePath, show_shapes = True, expand_nested = True, dpi = figure_dpi)
-			print("The model image is successfully saved. ")
-			break
-		except Exception as e:
-			print("Failed saving the model image. Details are as follows. \n{0}\nPlease press enter key to ".format(e) + ("retry (Remain: {0}). ".format(i) if i else "continue. "))
-			showerror("Error", "Failed saving the model image. \nPlease refer to the command prompt window for details. \nPlease press enter key to " + ("retry (Remain: {0}). ".format(i) if i else "continue. "))
-	else:
-		bRet = False
+	if mode != "ARIMA":
+		for i in range(MAX_RETRY_COUNT - 1, -1, -1):
+			try:
+				handleFolder(os.path.split(imagePath)[0])
+				plot_model(model, to_file = imagePath, show_shapes = True, expand_nested = True, dpi = figure_dpi)
+				print("The model image is successfully saved. ")
+				break
+			except Exception as e:
+				print("Train: Failed saving the model image. Details are as follows. \n{0}\nPlease press enter key to ".format(e) + ("retry (Remain: {0}). ".format(i) if i else "continue. "))
+				showerror("Error", "Failed saving the model image. \nPlease refer to the command prompt window for details. \nPlease press enter key to " + ("retry (Remain: {0}). ".format(i) if i else "continue. "))
+		else:
+			bRet = False
 	for i in range(MAX_RETRY_COUNT - 1, -1, -1):
 		try:
 			handleFolder(os.path.split(lossPath)[0])
-			if os.path.splitext(lossPath.lower())[1] in (".txt", ".csv"):
-				DF(hist.history).to_csv(lossPath)
+			if mode == "ARIMA":
+				with open(lossPath, "w", encoding = encoding) as f:
+					f.write(str(hist.summary()))
 			else:
-				DF(hist.history).to_excel(lossPath)
+				if os.path.splitext(lossPath.lower())[1] in (".txt", ".csv"):
+					DF(hist.history).to_csv(lossPath)
+				else:
+					DF(hist.history).to_excel(lossPath)
 			print("The loss data are successfully saved. ")
 			break
 		except Exception as e:
-			print("Failed saving the loss data. Details are as follows. \n{0}\nPlease press enter key to ".format(e) + ("retry (Remain: {0}). ".format(i) if i else "continue. "))
+			print("Train: Failed saving the loss data. Details are as follows. \n{0}\nPlease press enter key to ".format(e) + ("retry (Remain: {0}). ".format(i) if i else "continue. "))
 			showerror("Error", "Failed saving the loss data. \nPlease refer to the command prompt window for details. \nPlease press enter key to " + ("retry (Remain: {0}). ".format(i) if i else "continue. "))
 	else:
 		bRet = False
@@ -461,7 +528,7 @@ def test(button, encoding = "utf-8") -> None:
 			else:
 				raise ValueError("The specified file lacks a column named {0}. ".format(attr))
 	except Exception as e:
-		print("Failed reading testing dataset. Details are as follows. \n{0}".format(e))
+		print("Test: Failed reading testing dataset. Details are as follows. \n{0}".format(e))
 		showerror("Error", "Failed reading testing dataset. \nPlease refer to the command prompt window for details. ")
 		button["text"] = "Test"
 		button["fg"] = state_fg[-1]
@@ -470,27 +537,53 @@ def test(button, encoding = "utf-8") -> None:
 		return False
 	
 	# Process data #
-	x_test, y_test, scaler = processData(pf)
-	y_test = scaler.inverse_transform(y_test.reshape(-1, 1)).reshape(1, -1)[0]
-	if mode == "SAES":
-		x_test = x_test.reshape((x_test.shape[0], x_test.shape[1]))
-	else:
-		x_test = x_test.reshape((x_test.shape[0], x_test.shape[1], 1))
+	try:
+		x_test, y_test, scaler = processData(pf, isARIMA = mode == "ARIMA")
+		y_test = scaler.inverse_transform(y_test.reshape(-1, 1)).reshape(1, -1)[0]
+		if mode == "SAES":
+			x_test = x_test.reshape((x_test.shape[0], x_test.shape[1]))
+		else:
+			x_test = x_test.reshape((x_test.shape[0], x_test.shape[1], 1))
+	except Exception as e:
+		print("Test: Failed processing data. Details are as follows. \n{0}".format(e))
+		showerror("Error", "Failed processing data. \nPlease refer to the command prompt window for details. ")
+		button["text"] = "Test"
+		button["fg"] = state_fg[-1]
+		setControllersState(True)
+		tk.update()
+		return False
 	
 	# Test model #
-	model = load_model(modelPath)
-	predicted = model.predict(x_test)
-	predicted = scaler.inverse_transform(predicted.reshape(-1, 1)).reshape(1, -1)[0]
+	try:
+		if mode == "ARIMA":
+			model = ARIMA()
+			model.load_model(modelPath)
+			predicted = model.predict(pf.set_index([attrs[0]], inplace = False))
+		else:
+			model = load_model(modelPath)
+			predicted = model.predict(x_test)
+			predicted = scaler.inverse_transform(predicted.reshape(-1, 1)).reshape(1, -1)[0]
+		print("predicted.shape:", predicted.shape, "y_test.shape:",  y_test.shape)
+		n = predicted.shape[0]
+		values = concatenate((arange(1, n + 1, 1).reshape(n, 1), y_test.reshape(n, 1), predicted.reshape(n, 1)), axis = 1)
+		if mode == "GWO-LSTM":
+			for i in range(n):
+				values[i, 2] = values[i, 2] + gwo.fix(values[i, 1], values[i, 2], layer = 3)
+		else:
+			for i in range(n):
+				values[i, 2] = values[i, 2] + gwo.fix(values[i, 1], values[i, 2], layer = 2)
+		values = where(values < 1, 1, values) # limit values
+	except Exception as e:
+		print("Test: Failed testing the {0} model. Details are as follows. \n{1}\nPerhaps you need to train the model correctly first. ".format(mode, e))
+		showerror("Error", "Failed testing the {0} model. \nPlease refer to the command prompt window for details. \nPerhaps you need to train the model correctly first. ".format(mode))
+		button["text"] = "Test"
+		button["fg"] = state_fg[-1]
+		setControllersState(True)
+		tk.update()
+		return False
+	
+	# Dump #
 	bRet = True
-	n = predicted.shape[0]
-	values = concatenate((arange(1, n + 1, 1).reshape(n, 1), y_test.reshape(n, 1), predicted.reshape(n, 1)), axis = 1)
-	if mode == "GWO-LSTM":
-		for i in range(n):
-			values[i, 2] = values[i, 2] + gwo.fix(values[i, 1], values[i, 2], layer = 3)
-	else:
-		for i in range(n):
-			values[i, 2] = values[i, 2] + gwo.fix(values[i, 1], values[i, 2], layer = 2)
-	values = where(values < 1, 1, values)
 	for i in range(MAX_RETRY_COUNT - 1, -1, -1):
 		try:
 			handleFolder(os.path.split(resultPath)[0])
@@ -501,7 +594,7 @@ def test(button, encoding = "utf-8") -> None:
 			print("The testing results are successfully saved. ")
 			break
 		except Exception as e:
-			print("Failed saving the testing results. Details are as follows. \n{0}\nPlease press enter key to ".format(e) + ("retry (Remain: {0}). ".format(i) if i else "continue. "))
+			print("Test: Failed saving the testing results. Details are as follows. \n{0}\nPlease press enter key to ".format(e) + ("retry (Remain: {0}). ".format(i) if i else "continue. "))
 			showerror("Error", "Failed saving the testing results. \nPlease refer to the command prompt window for details. \nPlease press enter key to " + ("retry (Remain: {0}). ".format(i) if i else "continue. "))
 	else:
 		bRet = False
@@ -544,7 +637,7 @@ def compare(button, encoding = "utf-8") -> None:
 			else:
 				raise ValueError("The specified file lacks a column named {0}. ".format(attr))
 	except Exception as e:
-		print("Failed reading testing dataset. Details are as follows. \n{0}".format(e))
+		print("Compare: Failed reading testing dataset. Details are as follows. \n{0}".format(e))
 		showerror("Error", "Failed reading testing dataset. \nPlease refer to the command prompt window for details. ")
 		button["text"] = "Compare"
 		button["fg"] = state_fg[-1]
@@ -599,7 +692,7 @@ def compare(button, encoding = "utf-8") -> None:
 			print("The plot results are successfully saved. ")
 			break
 		except Exception as e:
-			print("Failed saving the plot results. Details are as follows. \n{0}\nPlease press enter key to ".format(e) + ("retry (Remain: {0}). ".format(i) if i else "continue. "))
+			print("Compare: Failed saving the plot results. Details are as follows. \n{0}\nPlease press enter key to ".format(e) + ("retry (Remain: {0}). ".format(i) if i else "continue. "))
 			showerror("Error", "Failed saving the plot results. \nPlease refer to the command prompt window for details. \nPlease press enter key to " + ("retry (Remain: {0}). ".format(i) if i else "continue. "))
 	else:
 		bRet = False
@@ -685,8 +778,8 @@ def main() -> int:
 	Label(model_frame, text = " " * common_gap_width, font = common_font).pack(side = LEFT)
 	Label(model_frame, text = "Mode: ", font = common_font).pack(side = LEFT)
 	global model_mode_combobox
-	model_mode_combobox = Combobox(model_frame, height = 4, width = 15, values = ("LSTM", "GWO-LSTM", "GRU", "SAES"), state = "readonly", font = common_font)
-	model_mode_combobox.current(1)
+	model_mode_combobox = Combobox(model_frame, height = 5, width = 15, values = ("ARIMA", "GRU", "GWO-LSTM", "LSTM", "SAES"), state = "readonly", font = common_font)
+	model_mode_combobox.current(2)
 	model_mode_combobox.bind("<<ComboboxSelected>>", lambda event:onComboboxSelect(event))
 	model_mode_combobox.pack(side = LEFT)
 	controllers[model_mode_combobox] = "readonly"
