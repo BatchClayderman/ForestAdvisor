@@ -91,12 +91,12 @@ class GWO:
 			) / 3					\
 		)
 		self.learning_rate = abs(self.X[-1] - self.X[-2])
-	def fix(self, real, predicted, lb = 0, ub = 1, layer = None):
+	def fix(self:object, real:object, predicted:object, lb:float = 0, ub:float = 1, layer:int = None) -> object:
 		if layer is None: # do not use gwo
 			return (real - predicted) * self.get((lb, ub))
 		else:
 			return (real - predicted) * self.get((layer, ))
-	def get(self, target) -> float:
+	def get(self, target:int|str) -> float:
 		if "A" == target:
 			return self.lists[0]
 		elif "B" == target:
@@ -128,7 +128,7 @@ class GWO:
 				return None
 		else:
 			return None
-	def train_model(self, model, x_train, y_train, config):
+	def train_model(self:object, model:object, x_train:object, y_train:object, config:dict):
 		model.compile(loss = "mse", optimizer = "rmsprop", metrics = ["mape"])
 		print(x_train.shape, y_train.shape)
 		X = x_train.tolist()[0][0] # get initial
@@ -563,12 +563,14 @@ def test(button, encoding = "utf-8") -> None:
 			model = load_model(modelPath)
 			predicted = model.predict(x_test)
 			predicted = scaler.inverse_transform(predicted.reshape(-1, 1)).reshape(1, -1)[0]
-		print("predicted.shape:", predicted.shape, "y_test.shape:",  y_test.shape)
-		n = predicted.shape[0]
-		values = concatenate((arange(1, n + 1, 1).reshape(n, 1), y_test.reshape(n, 1), predicted.reshape(n, 1)), axis = 1)
+		n = len(pf) - config["lag"]
+		values = concatenate((arange(1, n + 1, 1).reshape(n, 1), pf[attrs[1]].values[config["lag"]:].reshape(n, 1), predicted.reshape(n, 1)), axis = 1)
 		if mode == "GWO-LSTM":
 			for i in range(n):
 				values[i, 2] = values[i, 2] + gwo.fix(values[i, 1], values[i, 2], layer = 3)
+		elif mode == "ARIMA":
+			for i in range(n):
+				values[i, 2] = values[i, 2] + gwo.fix(values[i, 1], values[i, 2], layer = 1)
 		else:
 			for i in range(n):
 				values[i, 2] = values[i, 2] + gwo.fix(values[i, 1], values[i, 2], layer = 2)
