@@ -25,7 +25,7 @@ common_font = ("Times New Roman", 12)
 common_gap_width = 3
 common_entry_width = 24
 state_fg = {None:"black", -1:"orange", 0:"blue", 1:"#00EE00"}
-default_path_dict = {"modelFormat":"Model/{0}.h5", "pickleModelFormat":"Model/{0}.pkl", "imageFormat":"Image/{0}.png", "lossFormat":"Loss/{0}.csv", "pickleLossFormat":"Loss/{0}.txt", "resultFormat":"Result/{0}.csv"}
+default_path_dict = {"modelFormat":"Model/{0}.h5", "pickleModelFormat":"Model/{0}.pkl", "imageFormat":"Image/{0}.pdf", "lossFormat":"Loss/{0}.csv", "pickleLossFormat":"Loss/{0}.txt", "resultFormat":"Result/{0}.csv"}
 environment_requirements = [																																					\
 	("numpy", "global arange, array, concatenate, shuffle, where\nfrom numpy import arange, array, concatenate, where\nfrom numpy.random import shuffle", "Try to run \"pip install numpy\" to handle this issue. "), 																			\
 	("pandas", "global DF, read_csv, read_excel, to_datetime\nfrom pandas import DataFrame as DF, read_csv, read_excel, to_datetime", "Try to run \"pip install pandas\" to handle this issue. "), 																					\
@@ -680,6 +680,7 @@ def compare(button, encoding = "utf-8") -> None:
 	plt.rcParams["figure.dpi"] = 300
 	plt.rcParams["savefig.dpi"] = 300
 	plt.rcParams["font.family"] = "Times New Roman"
+	plt.rcParams["font.size"] = 12
 	for value in values[1:]:
 		plt.plot(values[0], value)
 	plt.legend(columns[1:])
@@ -690,7 +691,7 @@ def compare(button, encoding = "utf-8") -> None:
 	for i in range(MAX_RETRY_COUNT - 1, -1, -1):
 		try:
 			handleFolder(os.path.split(plotPath)[0])
-			plt.savefig(plotPath)
+			plt.savefig(plotPath, bbox_inches = "tight")
 			print("The plot results are successfully saved. ")
 			break
 		except Exception as e:
@@ -748,7 +749,7 @@ def main() -> int:
 		else:
 			configIvs[key] = IntVar(value = config[key])
 	global modelPathSv, imagePathSv, trainPathSv, lossPathSv, testPathSv, resultPathSv, inputPathSv, comparisonPathSv, plotPathSv
-	modelPathSv, imagePathSv, trainPathSv, lossPathSv, testPathSv, resultPathSv, inputPathSv, comparisonPathSv, plotPathSv = StringVar(value = "Model/GWO-LSTM.h5"), StringVar(value = "Image/GWO-LSTM.png"), StringVar(value = "Dataset/Train.csv"), StringVar(value = "Loss/GWO-LSTM.csv"), StringVar(value = "Dataset/Test.csv"), StringVar(value = "Result/GWO-LSTM.csv"), StringVar(value = "Result"), StringVar(value = "comparison.csv"), StringVar(value = "comparison.png")
+	modelPathSv, imagePathSv, trainPathSv, lossPathSv, testPathSv, resultPathSv, inputPathSv, comparisonPathSv, plotPathSv = StringVar(value = "Model/GWO-LSTM.h5"), StringVar(value = "Image/GWO-LSTM.pdf"), StringVar(value = "Dataset/Train.csv"), StringVar(value = "Loss/GWO-LSTM.csv"), StringVar(value = "Dataset/Test.csv"), StringVar(value = "Result/GWO-LSTM.csv"), StringVar(value = "Result"), StringVar(value = "comparison.csv"), StringVar(value = "comparison.pdf")
 	
 	# Environment Part #
 	environment_frame = Frame(tk, relief = RAISED, borderwidth = 2, width = frame_width)
@@ -800,7 +801,7 @@ def main() -> int:
 	model_image_entry.pack(side = LEFT)
 	controllers[model_image_entry] = "normal"
 	Label(model_frame, text = " ", font = common_font).pack(side = LEFT)
-	model_image_button = Button(model_frame, text = " .. ", command = lambda:browseFile(model_image_entry, filetypes = [("PNG Files", "*.png"), ("JPG Files", "*.jpg"), ("JPEG Files", "*.jpeg")]), font = common_font, fg = state_fg[None])
+	model_image_button = Button(model_frame, text = " .. ", command = lambda:browseFile(model_image_entry, filetypes = [("PNG Files", "*.png"), ("JPG Files", "*.jpg"), ("JPEG Files", "*.jpeg"), ("PDF Files", "*.pdf")]), font = common_font, fg = state_fg[None])
 	model_image_button.pack(side = LEFT)
 	controllers[model_path_button] = "normal"
 	
@@ -886,7 +887,7 @@ def main() -> int:
 	comparison_plot_entry.pack(side = LEFT)
 	controllers[comparison_plot_entry] = "normal"
 	Label(comparison_frame, text = " ", font = common_font).pack(side = LEFT)
-	comparison_plot_button = Button(comparison_frame, text = " .. ", command = lambda:browseFile(comparison_plot_entry, filetypes = [("PNG Files", "*.png"), ("JPG Files", "*.jpg"), ("JPEG Files", "*.jpeg")]), font = common_font, fg = state_fg[None])
+	comparison_plot_button = Button(comparison_frame, text = " .. ", command = lambda:browseFile(comparison_plot_entry, filetypes = [("PNG Files", "*.png"), ("JPG Files", "*.jpg"), ("JPEG Files", "*.jpeg"), ("PDF Files", "*.pdf")]), font = common_font, fg = state_fg[None])
 	comparison_plot_button.pack(side = LEFT)
 	controllers[comparison_plot_button] = "normal"
 	Label(comparison_frame, text = " " * common_gap_width, font = common_font).pack(side = RIGHT)
