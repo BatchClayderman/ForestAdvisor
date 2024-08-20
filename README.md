@@ -20,8 +20,12 @@ This part contains software named ``CarbonPredictor`` for predicting carbon valu
 
 ### ARIMA
 
-This is the baseline suggested for the research. 
+This is a baseline model suggested for the research in the carbon prediction part. 
 
 ### CarbonPredictor
 
-CarbonPredictor is a Python script with a friendly GUI for training and testing models including LSTM, GWO-LSTM, GRU, and SAES. 
+CarbonPredictor is a Python script with a friendly GUI for training and testing models including ARIMA, GRU, GWO-LSTM, LSTM, and SAES. 
+
+Please modify the GWO implementation and the related calls to it when the CarbonPredictor is applied to different datasets. 
+
+The original GWO with initial values specified and related calls in training and testing is just an example of use. 
