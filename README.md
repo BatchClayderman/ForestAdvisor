@@ -24,13 +24,13 @@ This is a baseline model suggested for research on carbon prediction.
 
 ### CarbonPredictor
 
-CarbonPredictor is a Python script with a friendly GUI for training and testing models including ARIMA, GRU, GWO-LSTM, LSTM, and SAES. 
+CarbonPredictor is a Python script with a friendly GUI for training and testing models, including ARIMA, GRU, GWO-LSTM, LSTM, and SAES. 
 
 Currently, no regularization or other pre-processing procedures are implemented. 
 
 Therefore, users may need to scale the pure values of their data to a suitable value range like $[1, 10000]$ via scientific ways to avoid underfitting. 
 
-Please modify the GWO implementation and the related calls to it when the CarbonPredictor is applied to different datasets. 
+Please modify the GWO implementation and its related calls when the CarbonPredictor is applied to different datasets. 
 
 The original GWO here with initial values specified and related calls in training and testing is just an example of use. 
 
