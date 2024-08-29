@@ -62,4 +62,6 @@ To avoid the image content going beyond the borders or having too much blank spa
 
 The computing formula for the evaluation metric MAPE is revised. 
 
+If values are different from those in the publication, please refer to the values here. 
+
 The folder for the output results of ``runPlot.py`` is changed. 
