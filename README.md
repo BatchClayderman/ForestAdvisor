@@ -57,3 +57,9 @@ The codes are further optimized and decoupled with some logic adjusted.
 In this version, the PDF file type is selected as the default file type for image storage. 
 
 To avoid the image content going beyond the borders or having too much blank space around it, the option ``bbox_inches = "tight"`` is used. 
+
+#### v2.2
+
+The computing formula for the evaluation metric MAPE is revised. 
+
+The folder for the output results of ``runPlot.py`` is changed. 
