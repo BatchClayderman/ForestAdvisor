@@ -2,7 +2,7 @@
 
 ForestAdvisor is a system for collecting, selecting, and optimizing forest management plans. The system contains the natural language processing part and the carbon prediction part. 
 
-## Natural Language Processing Part
+## The Natural Language Processing Part
 
 This part contains parts of codes from the UWC and the Bert. 
 
@@ -14,7 +14,7 @@ Some codes from the UWC are contained. Please visit [https://github.com/BatchCla
 
 A trained Bert model is contained. 
 
-## Carbon Prediction Part
+## The Carbon Prediction Part
 
 This part contains software named ``CarbonPredictor`` for predicting carbon values. 
 
