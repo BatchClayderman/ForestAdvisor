@@ -42,7 +42,7 @@ train_thread = None
 attrs = ("Time", "Value")
 controllers = {}
 figure_dpi = 1200
-global_metrics = {"MAPE":(lambda r, p, n:sum((p - r) / r) / n), "RMSE":(lambda r, p, n:(sum((p - r) ** 2) / n) ** 0.5), "MSE":(lambda r, p, n:(sum(p - r) ** 2) / n), "SSE":(lambda r, p, n:sum((p - r) ** 2)), "MAE":(lambda r, p, n:sum(abs(p - r)) / n), "SSR":(lambda r, p, n:sum((p - sum(r) / n) ** 2)), "R2":(lambda r, p, n:1 - sum((p - r) ** 2) / sum((sum(r) / n - r) ** 2))}
+global_metrics = {"MAPE":(lambda r, p, n:sum(abs((p - r) / r)) / n), "RMSE":(lambda r, p, n:(sum((p - r) ** 2) / n) ** 0.5), "MSE":(lambda r, p, n:(sum(p - r) ** 2) / n), "SSE":(lambda r, p, n:sum((p - r) ** 2)), "MAE":(lambda r, p, n:sum(abs(p - r)) / n), "SSR":(lambda r, p, n:sum((p - sum(r) / n) ** 2)), "R2":(lambda r, p, n:1 - sum((p - r) ** 2) / sum((sum(r) / n - r) ** 2))}
 comparison_entry_width = 13
 
 
