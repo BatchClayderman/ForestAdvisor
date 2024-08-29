@@ -10,19 +10,40 @@ except:
 os.chdir(os.path.abspath(os.path.dirname(__file__)))
 EXIT_SUCCESS = 0
 EXIT_FAILURE = 1
+EOF = -1
 folders = ["CarbonPredictorFinland", "CarbonPredictorHeilongjiang", "CarbonPredictorMaine"]
 filename = "comparison.csv"
+plotFolder = "Plot"
 xCol = "Index"
 yCol = "GWO-LSTM"
 ext = ".pdf"
 dpi = 1200
 
 
+def handleFolder(fd:str) -> bool:
+	folder = str(fd)
+	if folder in ("", ".", "./", ".\\"):
+		return True
+	elif os.path.exists(folder):
+		return os.path.isdir(folder)
+	else:
+		try:
+			os.makedirs(folder)
+			return True
+		except:
+			return False
+
 def main():
+	if not handleFolder(plotFolder):
+		print("The result folder is not created successfully. ")
+		print("Please press the enter key to exit. ")
+		input()
+		return EOF
 	bRet = True
 	for folder in folders:
 		source = os.path.join(folder, filename)
 		target = folder + ext
+		target = os.path.join(plotFolder, os.path.split(target)[1])
 		print("Generating: \"{0}\"".format(target))
 		try:
 			df = read_csv(source, engine = "python", skipfooter = 7)
