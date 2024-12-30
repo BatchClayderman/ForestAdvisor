@@ -36,11 +36,9 @@ The original GWO here with initial values specified and related calls in trainin
 
 #### v0.5
 
-The previous version of CarbonPredictor without a GUI, aimed to predict short-term traffic flows at first. 
+The previous version of CarbonPredictor without a GUI, aimed to predict short-term traffic flows at first can be found [here](https://github.com/BatchClayderman/CEEMDAN-SE-GWO-LSTM). 
 
-As this version has not been under maintenance for a long time, it may contain potential errors and exceptions. 
-
-Please visit [https://github.com/BatchClayderman/CEEMDAN-SE-GWO-LSTM](https://github.com/BatchClayderman/CEEMDAN-SE-GWO-LSTM) to view this version. 
+As this version has not been and will **no longer be under maintenance** for a long time, it may contain potential errors and exceptions. 
 
 #### v1.0
 
